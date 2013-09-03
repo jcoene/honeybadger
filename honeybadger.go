@@ -56,10 +56,14 @@ type Report struct {
 	Server   *Server   `json:"server"`
 }
 
-// Create a new report using the current call stack.
-// Supply a value for artifically added depth (0 if called directly)
-// and an object describing the error encountered.
-func NewReport(depth int, msg interface{}) (r *Report, err error) {
+// Create a new report using the given error message and current call stack.
+func NewReport(msg interface{}) (r *Report, err error) {
+	return NewReportWithSkipCallers(msg, 0)
+}
+
+// Create a new report using the given error message and current call stack.
+// Supply an integer indicating how many callers to skip (0 is none).
+func NewReportWithSkipCallers(msg interface{}, skipCallers int) (r *Report, err error) {
 	var cwd, hostname string
 
 	if ApiKey == "" {
@@ -105,7 +109,7 @@ func NewReport(depth int, msg interface{}) (r *Report, err error) {
 	runtime.Callers(0, callers)
 
 	for i, pc := range callers {
-		if i < 3 { // skip two levels of self-inflicted depth
+		if i < 3 { // skip self-inflicted depth
 			continue
 		}
 
@@ -116,7 +120,7 @@ func NewReport(depth int, msg interface{}) (r *Report, err error) {
 			f, n := fc.FileLine(pc)
 
 			// If we reach our origin depth, use the given function name as error class
-			if i == depth+2 {
+			if i == skipCallers+2 {
 				r.Error.Class = m
 			}
 

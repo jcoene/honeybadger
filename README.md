@@ -14,6 +14,7 @@ import "github.com/jcoene/honeybadger"
 func main() {
   // Set the API key
   honeybadger.ApiKey = "abcdef"
+
   // Set the application environment
   honeybadger.Environment = "production"
 }
@@ -26,7 +27,7 @@ func DoStuff() (err error) {
   if err = doOtherThing(); err != nil {
     // Create a new report with 0 call stack inflation (more on that later)
     // Give it the error we received as the message (could be anything)
-    report, err2 := honeybadger.NewReport(0, err)
+    report, err2 := honeybadger.NewReport(err)
 
     // Send the error (asynchronously in a Goroutine)
     report.Dispatch()
@@ -40,7 +41,7 @@ It's possible (I'd say advisable) to add some context for the failure:
 
 ```go
 // Create the report
-report, _ := honeybadger.NewReport(0, err)
+report, _ := honeybadger.NewReport(err)
 
 // Set the request URL
 report.Request.URL = myHttpReq.URL
@@ -57,14 +58,11 @@ There are a few additional convenience methods for adding context of various typ
 
 ### Labels and Backtraces
 
-Your error reports are automatically labeled and given backtraces based on the call stack. This is accomplished using the Go runtime package, and has a few quirks:
+Your error reports are automatically labeled and given backtraces based on the call stack. This is accomplished using the Go runtime package. The automatically generated labels will only be accurate if the library can properly determine the origin of the error.
 
-The automatically generated labels will only be accurate if the library can properly determine the origin of the error. As such you'll need to supply the depth of stack inflation as the first argument to NewReport:
+If you do not call *honeybadger.NewReport* directly from the source of the error then you will need to specify the number of intermediate calls so that the library can properly identify the original caller. You can do this by creating your error report with *NewReportWithSkipCallers* instead of *NewReport*.
 
-- **0** means that *honeybadger.NewReport* is called directly from the function reporting the error
-- **1** indicates the error is one step removed - useful for a helper function.
-
-For example, let's say you want to have a single helper function in your service to report errors, it should call NewReport with a depth of 1:
+For example, let's say you want to have a  helper function in your service to report errors, it should call *NewReportWithSkipCallers* with a depth of 1:
 
 ```go
   func Get(req, resp, ...) {
@@ -78,11 +76,11 @@ For example, let's say you want to have a single helper function in your service
 
   func reportError(req, resp, err) {
     // Create the report with an inflated stack depth of 1
-    report, err2 := honeybadger.NewReport(1, err)
+    report, err2 := honeybadger.NewReportWithSkipCallers(err, 1)
 
     // Fill in a bunch of useful information from the request
     report.Request.URL = req.URL
-    
+
     // ...
 
     // Send
