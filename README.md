@@ -4,6 +4,8 @@ This is an unofficial notifier library for integrating Go applications with [Hon
 
 ## Usage
 
+### Getting Started
+
 First you'll need to import the library and set your Honeybadger API key and an environment name for your application:
 
 ```go
@@ -30,8 +32,11 @@ func DoStuff() (err error) {
     report.Dispatch()
   }
 }
+```
 
-It's also possible (advisable) to add some context for the failure:
+### Adding Context
+
+It's possible (I'd say advisable) to add some context for the failure:
 
 ```go
 // Create the report
@@ -46,9 +51,20 @@ for k, v := range myHttpReq.Header {
 }
 ```
 
-Errors are automatically labeled and given backtraces based on the call stack. The automatic labels only work if the Honeybadger library can properly determine the origin of the error. You'll need to supply the depth of stack inflation as the first argument to NewReport (0 assumes that honeybadger.NewReport is called directly from the function reporting the error, 1 being one call removed in case of the use of a helper function).
+The Report object you create by calling NewReport is self describing and can be manipulated as you see fit. Inspect it and make it work for you.
 
-For example, let's say you want to have a helper function in your service to report errors, it should call NewReport with a depth of 1:
+There are a few additional convenience methods for adding context of various types. *AddContext*, *AddParam*, and *AddSession* all take a key and value to build on the hash for their respective category.
+
+### Labels and Backtraces
+
+Your error reports are automatically labeled and given backtraces based on the call stack. This is accomplished using the Go runtime package, and has a few quirks:
+
+The automatically generated labels will only be accurate if the library can properly determine the origin of the error. As such you'll need to supply the depth of stack inflation as the first argument to NewReport:
+
+- **0** means that *honeybadger.NewReport* is called directly from the function reporting the error
+- **1** indicates the error is one step removed - useful for a helper function.
+
+For example, let's say you want to have a single helper function in your service to report errors, it should call NewReport with a depth of 1:
 
 ```go
   func Get(req, resp, ...) {
@@ -58,7 +74,7 @@ For example, let's say you want to have a helper function in your service to rep
     }
   }
 
-  ...
+  // ...
 
   func reportError(req, resp, err) {
     // Create the report with an inflated stack depth of 1
@@ -66,13 +82,20 @@ For example, let's say you want to have a helper function in your service to rep
 
     // Fill in a bunch of useful information from the request
     report.Request.URL = req.URL
-    ...
+    
+    // ...
 
     // Send
     report.Dispatch()
   }
 ```
 
+### Sending Error Reports
+
+Use the **Dispatch** method to send a report asynchronously.
+
+If you'd like to see the result of the send operation, you can call **Send** (which returns an error or nil).
+
 ## License
 
-MIT
+MIT License.
