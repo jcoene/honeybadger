@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"runtime"
@@ -54,6 +55,48 @@ type Report struct {
 	Error    *Error    `json:"error"`
 	Request  *Request  `json:"request"`
 	Server   *Server   `json:"server"`
+}
+
+// Send sends a report to HB synchronously
+func Send(err error) {
+	if ApiKey == "" {
+		return
+	}
+	report, e := NewReport(err)
+	if e != nil {
+		log.Printf("honeybadger: could not create report: %s", e)
+		return
+	}
+	if e := report.Send(); e != nil {
+		log.Printf("honeybadger: could not send report: %s", e)
+		return
+	}
+}
+
+// Dispatch sends a report to HB asynchronously
+func Dispatch(err error) {
+	if ApiKey == "" {
+		return
+	}
+	DispatchWithContext(err, nil)
+}
+
+// DispatchWithContext sends a report to HB asynchronously with context
+func DispatchWithContext(err error, context map[string]interface{}) {
+	if ApiKey == "" {
+		return
+	}
+	report, e := NewReport(err)
+	if e != nil {
+		log.Printf("honeybadger: could not create report: %s", e)
+		return
+	}
+	if context != nil {
+		for k,v := range context {
+			report.AddContext(k,v)
+		}
+	}
+	report.Dispatch()
 }
 
 // Create a new report using the given error message and current call stack.
@@ -155,7 +198,9 @@ func (r *Report) AddSession(k string, v interface{}) {
 // Send the report asynchronously
 func (r *Report) Dispatch() {
 	go func() {
-		r.Send()
+		if err := r.Send(); err != nil {
+			log.Printf("honeybadger: could not send report: %s", err)
+		}
 	}()
 }
 
@@ -166,7 +211,7 @@ func (r *Report) Send() (err error) {
 	var payload []byte
 
 	if payload, err = json.MarshalIndent(r, "", "  "); err != nil {
-		return err
+		return
 	}
 
 	if req, err = http.NewRequest("POST", "https://www.honeybadger.io/v1/notices", bytes.NewBuffer(payload)); err != nil {
@@ -185,6 +230,5 @@ func (r *Report) Send() (err error) {
 	if resp.StatusCode < 201 {
 		err = errors.New(fmt.Sprintf("unable to send: error %d", resp.StatusCode))
 	}
-
 	return
 }
