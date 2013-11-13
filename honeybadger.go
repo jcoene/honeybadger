@@ -58,38 +58,39 @@ type Report struct {
 }
 
 // Send sends a report to HB synchronously
-func Send(err error) {
+func Send(err error) error {
 	if ApiKey == "" {
-		return
+		return err
 	}
 	report, e := NewReport(err)
 	if e != nil {
 		log.Printf("honeybadger: could not create report: %s", e)
-		return
+		return err
 	}
 	if e := report.Send(); e != nil {
 		log.Printf("honeybadger: could not send report: %s", e)
-		return
 	}
+	return err
 }
 
 // Dispatch sends a report to HB asynchronously
-func Dispatch(err error) {
+func Dispatch(err error) error {
 	if ApiKey == "" {
-		return
+		return err
 	}
 	DispatchWithContext(err, nil)
+	return err
 }
 
 // DispatchWithContext sends a report to HB asynchronously with context
-func DispatchWithContext(err error, context map[string]interface{}) {
+func DispatchWithContext(err error, context map[string]interface{}) error {
 	if ApiKey == "" {
-		return
+		return err
 	}
 	report, e := NewReport(err)
 	if e != nil {
 		log.Printf("honeybadger: could not create report: %s", e)
-		return
+		return err
 	}
 	if context != nil {
 		for k,v := range context {
@@ -97,6 +98,7 @@ func DispatchWithContext(err error, context map[string]interface{}) {
 		}
 	}
 	report.Dispatch()
+	return err
 }
 
 // Create a new report using the given error message and current call stack.
