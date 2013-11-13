@@ -180,6 +180,7 @@ func (r *Report) Send() (err error) {
 	if resp, err = http.DefaultClient.Do(req); err != nil {
 		return
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode < 201 {
 		err = errors.New(fmt.Sprintf("unable to send: error %d", resp.StatusCode))
