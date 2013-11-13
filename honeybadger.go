@@ -12,8 +12,6 @@ import (
 	"strings"
 )
 
-var ApiKey, Environment string
-
 type Notifier struct {
 	Name     string `json:"name"`
 	Url      string `json:"url"`
@@ -57,7 +55,50 @@ type Report struct {
 	Server   *Server   `json:"server"`
 }
 
-// Send sends a report to HB synchronously
+type errBundle struct {
+	err error
+	context map[string]interface{}
+}
+
+var (
+	ApiKey string
+	Environment string
+	errCh chan errBundle
+)
+
+func Start(apiKey, environment string) {
+	ApiKey = apiKey
+	Environment = environment
+
+	if ApiKey != "" {
+		const numWorkers = 10
+		const bufferSize = 1024 * 1024
+		errCh = make(chan errBundle, bufferSize)
+		for i := 0; i < numWorkers; i++{
+			go consume()
+		}
+	}
+}
+
+func consume() {
+	for b := range errCh {
+		report, e := NewReport(b.err)
+		if e != nil {
+			log.Printf("honeybadger: could not create report: %s", e)
+			continue
+		}
+		if b.context != nil {
+			for k,v := range b.context {
+				report.AddContext(k,v)
+			}
+		}
+		if e := report.Send(); e != nil {
+			log.Printf("honeybadger: could not send report: %s", e)
+		}
+	}
+}
+
+// Send sends a report to HB synchronously and returns the error
 func Send(err error) error {
 	if ApiKey == "" {
 		return err
@@ -73,30 +114,18 @@ func Send(err error) error {
 	return err
 }
 
-// Dispatch sends a report to HB asynchronously
+// Dispatch sends a report to HB asynchronously and returns the error
 func Dispatch(err error) error {
-	if ApiKey == "" {
-		return err
-	}
 	return DispatchWithContext(err, nil)
 }
 
-// DispatchWithContext sends a report to HB asynchronously with context
+// DispatchWithContext sends a report to HB asynchronously with context and
+// returns the error
 func DispatchWithContext(err error, context map[string]interface{}) error {
 	if ApiKey == "" {
 		return err
 	}
-	report, e := NewReport(err)
-	if e != nil {
-		log.Printf("honeybadger: could not create report: %s", e)
-		return err
-	}
-	if context != nil {
-		for k,v := range context {
-			report.AddContext(k,v)
-		}
-	}
-	report.Dispatch()
+	errCh <- errBundle{err:err, context:context}
 	return err
 }
 
