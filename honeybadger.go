@@ -78,8 +78,7 @@ func Dispatch(err error) error {
 	if ApiKey == "" {
 		return err
 	}
-	DispatchWithContext(err, nil)
-	return err
+	return DispatchWithContext(err, nil)
 }
 
 // DispatchWithContext sends a report to HB asynchronously with context
