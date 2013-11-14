@@ -125,7 +125,11 @@ func DispatchWithContext(err error, context map[string]interface{}) error {
 	if ApiKey == "" {
 		return err
 	}
-	errCh <- errBundle{err:err, context:context}
+	select {
+	case errCh <- errBundle{err:err, context:context}:
+	default:
+		log.Printf("honeybadger: queue is full, dropping on the floor: %s", err)
+	}
 	return err
 }
 
