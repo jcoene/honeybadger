@@ -248,7 +248,7 @@ func (r *Report) Send() (err error) {
 		return
 	}
 
-	if req, err = http.NewRequest("POST", "https://www.honeybadger.io/v1/notices", bytes.NewBuffer(payload)); err != nil {
+	if req, err = http.NewRequest("POST", "https://api.honeybadger.io/v1/notices", bytes.NewBuffer(payload)); err != nil {
 		return
 	}
 
