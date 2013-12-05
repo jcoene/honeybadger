@@ -70,14 +70,18 @@ func Start(apiKey, environment string) {
 	ApiKey = apiKey
 	Environment = environment
 
-	if ApiKey != "" {
-		const numWorkers = 10
-		const bufferSize = 1024
-		errCh = make(chan errBundle, bufferSize)
-		for i := 0; i < numWorkers; i++{
-			go consume()
-		}
+	if ApiKey == "" {
+		log.Println("Honeybadger disabled")
+		return
 	}
+
+	const numWorkers = 10
+	const bufferSize = 1024
+	errCh = make(chan errBundle, bufferSize)
+	for i := 0; i < numWorkers; i++{
+		go consume()
+	}
+	log.Println("Honeybadger client started")
 }
 
 func consume() {
