@@ -55,15 +55,10 @@ type Report struct {
 	Server   *Server   `json:"server"`
 }
 
-type errBundle struct {
-	err error
-	context map[string]interface{}
-}
-
 var (
-	ApiKey string
+	ApiKey      string
 	Environment string
-	errCh chan errBundle
+	reports     chan *Report
 )
 
 func Start(apiKey, environment string) {
@@ -77,25 +72,17 @@ func Start(apiKey, environment string) {
 
 	const numWorkers = 10
 	const bufferSize = 1024
-	errCh = make(chan errBundle, bufferSize)
-	for i := 0; i < numWorkers; i++{
+
+	reports = make(chan *Report, bufferSize)
+	for i := 0; i < numWorkers; i++ {
 		go consume()
 	}
+
 	log.Println("Honeybadger client started")
 }
 
 func consume() {
-	for b := range errCh {
-		report, e := NewReport(b.err)
-		if e != nil {
-			log.Printf("honeybadger: could not create report: %s", e)
-			continue
-		}
-		if b.context != nil {
-			for k,v := range b.context {
-				report.AddContext(k,v)
-			}
-		}
+	for report := range reports {
 		if e := report.Send(); e != nil {
 			log.Printf("honeybadger: could not send report: %s", e)
 		}
@@ -129,8 +116,19 @@ func DispatchWithContext(err error, context map[string]interface{}) error {
 	if ApiKey == "" {
 		return err
 	}
+	report, rErr := NewReport(err)
+	if rErr != nil {
+		log.Printf("honeybadger: could not create report: %s", rErr)
+		return err
+	}
+	if context != nil {
+		for k, v := range context {
+			report.AddContext(k, v)
+		}
+	}
+
 	select {
-	case errCh <- errBundle{err:err, context:context}:
+	case reports <- report:
 	default:
 		log.Printf("honeybadger: queue is full, dropping on the floor: %s", err)
 	}
