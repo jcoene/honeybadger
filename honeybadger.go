@@ -140,6 +140,15 @@ func NewReport(msg interface{}) (r *Report, err error) {
 	return NewReportWithSkipCallers(msg, 0)
 }
 
+func fullMessage(msg interface{}) string {
+	return fmt.Sprintf("%s", msg)
+}
+
+func exceptionClass(message string) string {
+	pieces := strings.Split(message, ":")
+	return strings.TrimSpace(pieces[len(pieces)-1])
+}
+
 // Create a new report using the given error message and current call stack.
 // Supply an integer indicating how many callers to skip (0 is none).
 func NewReportWithSkipCallers(msg interface{}, skipCallers int) (r *Report, err error) {
@@ -158,6 +167,9 @@ func NewReportWithSkipCallers(msg interface{}, skipCallers int) (r *Report, err 
 	cwd, _ = os.Getwd()
 	hostname, _ = os.Hostname()
 
+	fullMessage := fullMessage(msg)
+	exceptionClass := exceptionClass(fullMessage)
+
 	r = &Report{
 		Notifier: &Notifier{
 			Name:     "Honeybadger (Go)",
@@ -166,8 +178,8 @@ func NewReportWithSkipCallers(msg interface{}, skipCallers int) (r *Report, err 
 			Language: "Go",
 		},
 		Error: &Error{
-			Class:     "Unknown",
-			Message:   fmt.Sprintf("%s", msg),
+			Class:     exceptionClass,
+			Message:   fullMessage,
 			Backtrace: make([]*BacktraceLine, 0),
 			Source:    make(map[string]interface{}),
 		},
