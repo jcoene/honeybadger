@@ -146,7 +146,13 @@ func fullMessage(msg interface{}) string {
 
 func exceptionClass(message string) string {
 	pieces := strings.Split(message, ":")
-	return strings.TrimSpace(pieces[len(pieces)-1])
+	for i := len(pieces)-1; i >= 0; i-- {
+		err := strings.TrimSpace(pieces[i])
+		if len(err) > 0 {
+			return err
+		}
+	}
+	return ""
 }
 
 // Create a new report using the given error message and current call stack.

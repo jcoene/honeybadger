@@ -20,6 +20,24 @@ func TestExceptionClass(t *testing.T) {
 	if result != "io error" {
 		t.Fatalf("Should have been 'io error' but was '%s'", result)
 	}
+
+	result = exceptionClass("honeybadger: failed because:")
+	if result != "failed because" {
+		t.Fatalf("Should have been 'failed because' but was '%s'", result)
+	}
+
+	// test space trimming
+	result = exceptionClass("honeybadger: failed because :    ")
+	if result != "failed because" {
+		t.Fatalf("Should have been 'failed because' but was '%s'", result)
+	}
+
+	// test space trimming
+	result = exceptionClass("honeybadger::")
+	if result != "honeybadger" {
+		t.Fatalf("Should have been 'honeybadger' but was '%s'", result)
+	}
+
 }
 
 func TestFullMessage(t *testing.T) {
