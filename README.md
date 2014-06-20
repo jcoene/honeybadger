@@ -1,4 +1,6 @@
-# Honeybadger Go Client
+# Honeybadger Go Client 
+
+<img src="https://api.travis-ci.org/librato/honeybadger.png"/>
 
 This is an unofficial notifier library for integrating Go applications with [Honeybadger](http://honeybadger.io).
 

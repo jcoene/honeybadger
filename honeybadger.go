@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
 )
-
-var ApiKey, Environment string
 
 type Notifier struct {
 	Name     string `json:"name"`
@@ -56,9 +55,104 @@ type Report struct {
 	Server   *Server   `json:"server"`
 }
 
+var (
+	ApiKey      string
+	Environment string
+	reports     chan *Report
+)
+
+func Start(apiKey, environment string) {
+	ApiKey = apiKey
+	Environment = environment
+
+	if ApiKey == "" {
+		log.Println("Honeybadger disabled")
+		return
+	}
+
+	const numWorkers = 10
+	const bufferSize = 1024
+
+	reports = make(chan *Report, bufferSize)
+	for i := 0; i < numWorkers; i++ {
+		go consume()
+	}
+
+	log.Println("Honeybadger client started")
+}
+
+func consume() {
+	for report := range reports {
+		if e := report.Send(); e != nil {
+			log.Printf("honeybadger: could not send report: %s", e)
+		}
+	}
+}
+
+// Send sends a report to HB synchronously and returns the error
+func Send(err error) error {
+	if ApiKey == "" {
+		return err
+	}
+	report, e := NewReport(err)
+	if e != nil {
+		log.Printf("honeybadger: could not create report: %s", e)
+		return err
+	}
+	if e := report.Send(); e != nil {
+		log.Printf("honeybadger: could not send report: %s", e)
+	}
+	return err
+}
+
+// Dispatch sends a report to HB asynchronously and returns the error
+func Dispatch(err error) error {
+	return DispatchWithContext(err, nil)
+}
+
+// DispatchWithContext sends a report to HB asynchronously with context and
+// returns the error
+func DispatchWithContext(err error, context map[string]interface{}) error {
+	if ApiKey == "" {
+		return err
+	}
+	report, rErr := NewReport(err)
+	if rErr != nil {
+		log.Printf("honeybadger: could not create report: %s", rErr)
+		return err
+	}
+	if context != nil {
+		for k, v := range context {
+			report.AddContext(k, v)
+		}
+	}
+
+	select {
+	case reports <- report:
+	default:
+		log.Printf("honeybadger: queue is full, dropping on the floor: %s", err)
+	}
+	return err
+}
+
 // Create a new report using the given error message and current call stack.
 func NewReport(msg interface{}) (r *Report, err error) {
 	return NewReportWithSkipCallers(msg, 0)
+}
+
+func fullMessage(msg interface{}) string {
+	return fmt.Sprintf("%s", msg)
+}
+
+func exceptionClass(message string) string {
+	pieces := strings.Split(message, ":")
+	for i := len(pieces)-1; i >= 0; i-- {
+		err := strings.TrimSpace(pieces[i])
+		if len(err) > 0 {
+			return err
+		}
+	}
+	return ""
 }
 
 // Create a new report using the given error message and current call stack.
@@ -79,16 +173,19 @@ func NewReportWithSkipCallers(msg interface{}, skipCallers int) (r *Report, err 
 	cwd, _ = os.Getwd()
 	hostname, _ = os.Hostname()
 
+	fullMessage := fullMessage(msg)
+	exceptionClass := exceptionClass(fullMessage)
+
 	r = &Report{
 		Notifier: &Notifier{
 			Name:     "Honeybadger (Go)",
-			Url:      "https://github.com/jcoene/honeybadger-go",
+			Url:      "https://github.com/librato/honeybadger-go",
 			Version:  "1.0",
 			Language: "Go",
 		},
 		Error: &Error{
-			Class:     "Unknown",
-			Message:   fmt.Sprintf("%s", msg),
+			Class:     exceptionClass,
+			Message:   fullMessage,
 			Backtrace: make([]*BacktraceLine, 0),
 			Source:    make(map[string]interface{}),
 		},
@@ -155,7 +252,9 @@ func (r *Report) AddSession(k string, v interface{}) {
 // Send the report asynchronously
 func (r *Report) Dispatch() {
 	go func() {
-		r.Send()
+		if err := r.Send(); err != nil {
+			log.Printf("honeybadger: could not send report: %s", err)
+		}
 	}()
 }
 
@@ -166,10 +265,10 @@ func (r *Report) Send() (err error) {
 	var payload []byte
 
 	if payload, err = json.MarshalIndent(r, "", "  "); err != nil {
-		return err
+		return
 	}
 
-	if req, err = http.NewRequest("POST", "https://www.honeybadger.io/v1/notices", bytes.NewBuffer(payload)); err != nil {
+	if req, err = http.NewRequest("POST", "https://api.honeybadger.io/v1/notices", bytes.NewBuffer(payload)); err != nil {
 		return
 	}
 
@@ -180,10 +279,10 @@ func (r *Report) Send() (err error) {
 	if resp, err = http.DefaultClient.Do(req); err != nil {
 		return
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode < 201 {
 		err = errors.New(fmt.Sprintf("unable to send: error %d", resp.StatusCode))
 	}
-
 	return
 }
