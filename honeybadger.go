@@ -149,7 +149,7 @@ func fullMessage(msg interface{}) string {
 
 func exceptionClass(message string) string {
 	pieces := strings.Split(message, ":")
-	for i := len(pieces)-1; i >= 0; i-- {
+	for i := len(pieces) - 1; i >= 0; i-- {
 		err := strings.TrimSpace(pieces[i])
 		if len(err) > 0 {
 			return err
