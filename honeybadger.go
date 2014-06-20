@@ -10,6 +10,8 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
+	_ "crypto/sha512"
 )
 
 type Notifier struct {
