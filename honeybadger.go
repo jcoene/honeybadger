@@ -60,6 +60,7 @@ type Report struct {
 var (
 	ApiKey      string
 	Environment string
+	Client      *http.Client = http.DefaultClient
 	reports     chan *Report
 )
 
@@ -278,7 +279,7 @@ func (r *Report) Send() (err error) {
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("X-API-Key", ApiKey)
 
-	if resp, err = http.DefaultClient.Do(req); err != nil {
+	if resp, err = Client.Do(req); err != nil {
 		return
 	}
 	defer resp.Body.Close()
