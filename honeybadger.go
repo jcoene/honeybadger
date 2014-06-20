@@ -182,7 +182,7 @@ func NewReportWithSkipCallers(msg interface{}, skipCallers int) (r *Report, err 
 	r = &Report{
 		Notifier: &Notifier{
 			Name:     "Honeybadger (Go)",
-			Url:      "https://github.com/librato/honeybadger-go",
+			Url:      "https://github.com/jcoene/honeybadger-go",
 			Version:  "1.0",
 			Language: "Go",
 		},
